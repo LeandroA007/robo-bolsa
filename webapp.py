@@ -1,8 +1,5 @@
 from flask import Flask, render_template_string, request, send_file
 from app import analisar_acoes, exportar_csv
-import plotly.graph_objs as go
-import plotly.io as pio
-import json
 
 app = Flask(__name__)
 
@@ -26,8 +23,16 @@ HTML = """
         <label>Digite os códigos das ações (separados por vírgula):</label><br>
         <input type="text" name="acoes" size="50" placeholder="Ex: PETR4.SA,VALE3.SA"
                value="{{ entrada if entrada else '' }}">
+        <label>Período histórico:</label>
+        <select name="periodo">
+            <option value="1mo" {% if periodo=="1mo" %}selected{% endif %}>1 mês</option>
+            <option value="3mo" {% if periodo=="3mo" %}selected{% endif %}>3 meses</option>
+            <option value="6mo" {% if periodo=="6mo" %}selected{% endif %}>6 meses</option>
+            <option value="1y" {% if periodo=="1y" %}selected{% endif %}>1 ano</option>
+        </select>
         <input type="submit" value="Analisar">
     </form>
+
     {% if analise %}
     <h2>Resultados:</h2>
     <table border="1" cellpadding="8">
@@ -41,10 +46,11 @@ HTML = """
         {% endfor %}
     </table>
     <a href="/exportar">Exportar resultados para CSV</a>
+
     <h2>Gráficos:</h2>
     {% for acao, info in analise.items() %}
         <h3>{{acao}}</h3>
-        <div id="grafico_{{acao}}"></div>
+        <div id="grafico_{{acao}}" style="height:500px;"></div>
         <script>
             var trace1 = { x: {{info['Dados'].index.tolist()}}, y: {{info['Dados']['Close'].tolist()}}, mode: 'lines', name: 'Fechamento' };
             var trace2 = { x: {{info['Dados'].index.tolist()}}, y: {{info['Dados']['SMA20'].tolist()}}, mode: 'lines', name: 'SMA20' };
@@ -57,10 +63,11 @@ HTML = """
                 yaxis: {title: 'Preço'},
                 yaxis2: {title: 'RSI', overlaying: 'y', side: 'right'},
                 yaxis3: {title: 'MACD', overlaying: 'y', side: 'left', position: 0.95},
-                height: 500
+                height: 500,
+                margin: { t: 50 }
             };
             var data = [trace1, trace2, trace3, trace4, trace5, trace6];
-            Plotly.newPlot('grafico_{{acao}}', data, layout);
+            Plotly.newPlot('grafico_{{acao}}', data, layout, {responsive:true});
         </script>
     {% endfor %}
     {% endif %}
@@ -72,12 +79,14 @@ HTML = """
 def home():
     analise = None
     entrada = ""
+    periodo = "6mo"
     if request.method == "POST":
         entrada = request.form.get("acoes")
+        periodo = request.form.get("periodo") or "6mo"
         if entrada:
             lista_acoes = [a.strip() for a in entrada.split(",") if a.strip()]
-            analise = analisar_acoes(lista_acoes)
-    return render_template_string(HTML, analise=analise, entrada=entrada)
+            analise = analisar_acoes(lista_acoes, periodo)
+    return render_template_string(HTML, analise=analise, entrada=entrada, periodo=periodo)
 
 @app.route("/exportar")
 def exportar():
