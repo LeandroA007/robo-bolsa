@@ -1,7 +1,5 @@
 from flask import Flask, render_template_string, request
 from app import analisar_acoes
-import plotly.graph_objs as go
-import plotly.io as pio
 
 app = Flask(__name__)
 
@@ -12,14 +10,22 @@ HTML = """
     <meta charset="UTF-8">
     <title>Robô de Análise da Bolsa</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script>
+        // Atualiza automaticamente a página a cada 5 minutos (300000 ms)
+        setTimeout(function(){
+           document.getElementById('formulario').submit();
+        }, 300000);
+    </script>
 </head>
 <body>
-    <h1>Robô de Análise de Ações</h1>
-    <form method="post">
+    <h1>Robô de Análise de Ações - Atualização Automática</h1>
+    <form method="post" id="formulario">
         <label>Digite os códigos das ações (separados por vírgula):</label><br>
-        <input type="text" name="acoes" size="50" placeholder="Ex: PETR4.SA,VALE3.SA,ITUB4.SA">
+        <input type="text" name="acoes" size="50" placeholder="Ex: PETR4.SA,VALE3.SA,ITUB4.SA"
+               value="{{ entrada if entrada else '' }}">
         <input type="submit" value="Analisar">
     </form>
+    
     {% if analise %}
     <h2>Resultados:</h2>
     <table border="1" cellpadding="8">
@@ -32,6 +38,7 @@ HTML = """
         </tr>
         {% endfor %}
     </table>
+    
     <h2>Gráficos:</h2>
     {% for acao, info in analise.items() %}
         <h3>{{acao}}</h3>
@@ -52,12 +59,13 @@ HTML = """
 @app.route("/", methods=["GET", "POST"])
 def home():
     analise = None
+    entrada = ""
     if request.method == "POST":
         entrada = request.form.get("acoes")
         if entrada:
             lista_acoes = [a.strip() for a in entrada.split(",") if a.strip()]
             analise = analisar_acoes(lista_acoes)
-    return render_template_string(HTML, analise=analise)
+    return render_template_string(HTML, analise=analise, entrada=entrada)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)
