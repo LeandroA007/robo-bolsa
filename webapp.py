@@ -1,5 +1,7 @@
 from flask import Flask, render_template_string, request
 from app import analisar_acoes
+import plotly.graph_objs as go
+import plotly.io as pio
 
 app = Flask(__name__)
 
@@ -9,6 +11,7 @@ HTML = """
 <head>
     <meta charset="UTF-8">
     <title>Robô de Análise da Bolsa</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
     <h1>Robô de Análise de Ações</h1>
@@ -20,11 +23,27 @@ HTML = """
     {% if analise %}
     <h2>Resultados:</h2>
     <table border="1" cellpadding="8">
-        <tr><th>Ação</th><th>Análise</th></tr>
-        {% for acao, resultado in analise.items() %}
-        <tr><td>{{acao}}</td><td>{{resultado}}</td></tr>
+        <tr><th>Ação</th><th>Análise</th><th>Alerta</th></tr>
+        {% for acao, info in analise.items() %}
+        <tr>
+            <td>{{acao}}</td>
+            <td>{{info['Analise']}}</td>
+            <td>{{info['Alerta']}}</td>
+        </tr>
         {% endfor %}
     </table>
+    <h2>Gráficos:</h2>
+    {% for acao, info in analise.items() %}
+        <h3>{{acao}}</h3>
+        <div id="grafico_{{acao}}"></div>
+        <script>
+            var trace1 = { x: {{info['Dados'].index.tolist()}}, y: {{info['Dados']['Close'].tolist()}}, mode: 'lines', name: 'Fechamento' };
+            var trace2 = { x: {{info['Dados'].index.tolist()}}, y: {{info['Dados']['SMA20'].tolist()}}, mode: 'lines', name: 'SMA20' };
+            var trace3 = { x: {{info['Dados'].index.tolist()}}, y: {{info['Dados']['EMA20'].tolist()}}, mode: 'lines', name: 'EMA20' };
+            var data = [trace1, trace2, trace3];
+            Plotly.newPlot('grafico_{{acao}}', data);
+        </script>
+    {% endfor %}
     {% endif %}
 </body>
 </html>
