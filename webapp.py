@@ -1,5 +1,8 @@
-from flask import Flask, render_template_string, request
-from app import analisar_acoes
+from flask import Flask, render_template_string, request, send_file
+from app import analisar_acoes, exportar_csv
+import plotly.graph_objs as go
+import plotly.io as pio
+import json
 
 app = Flask(__name__)
 
@@ -11,7 +14,7 @@ HTML = """
     <title>Robô de Análise da Bolsa</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script>
-        // Atualiza automaticamente a página a cada 5 minutos (300000 ms)
+        // Atualiza automaticamente a página a cada 5 minutos
         setTimeout(function(){
            document.getElementById('formulario').submit();
         }, 300000);
@@ -21,24 +24,23 @@ HTML = """
     <h1>Robô de Análise de Ações - Atualização Automática</h1>
     <form method="post" id="formulario">
         <label>Digite os códigos das ações (separados por vírgula):</label><br>
-        <input type="text" name="acoes" size="50" placeholder="Ex: PETR4.SA,VALE3.SA,ITUB4.SA"
+        <input type="text" name="acoes" size="50" placeholder="Ex: PETR4.SA,VALE3.SA"
                value="{{ entrada if entrada else '' }}">
         <input type="submit" value="Analisar">
     </form>
-    
     {% if analise %}
     <h2>Resultados:</h2>
     <table border="1" cellpadding="8">
         <tr><th>Ação</th><th>Análise</th><th>Alerta</th></tr>
         {% for acao, info in analise.items() %}
-        <tr>
+        <tr style="color:{% if info['Alerta']=='POTENCIAL COMPRA' %}green{% elif info['Alerta']=='POTENCIAL VENDA' %}red{% else %}black{% endif %}">
             <td>{{acao}}</td>
             <td>{{info['Analise']}}</td>
             <td>{{info['Alerta']}}</td>
         </tr>
         {% endfor %}
     </table>
-    
+    <a href="/exportar">Exportar resultados para CSV</a>
     <h2>Gráficos:</h2>
     {% for acao, info in analise.items() %}
         <h3>{{acao}}</h3>
@@ -47,8 +49,18 @@ HTML = """
             var trace1 = { x: {{info['Dados'].index.tolist()}}, y: {{info['Dados']['Close'].tolist()}}, mode: 'lines', name: 'Fechamento' };
             var trace2 = { x: {{info['Dados'].index.tolist()}}, y: {{info['Dados']['SMA20'].tolist()}}, mode: 'lines', name: 'SMA20' };
             var trace3 = { x: {{info['Dados'].index.tolist()}}, y: {{info['Dados']['EMA20'].tolist()}}, mode: 'lines', name: 'EMA20' };
-            var data = [trace1, trace2, trace3];
-            Plotly.newPlot('grafico_{{acao}}', data);
+            var trace4 = { x: {{info['Dados'].index.tolist()}}, y: {{info['Dados']['RSI14'].tolist()}}, mode: 'lines', name: 'RSI14', yaxis: 'y2' };
+            var trace5 = { x: {{info['Dados'].index.tolist()}}, y: {{info['Dados']['MACD'].tolist()}}, mode: 'lines', name: 'MACD', yaxis: 'y3' };
+            var trace6 = { x: {{info['Dados'].index.tolist()}}, y: {{info['Dados']['Signal'].tolist()}}, mode: 'lines', name: 'Signal', yaxis: 'y3' };
+            
+            var layout = {
+                yaxis: {title: 'Preço'},
+                yaxis2: {title: 'RSI', overlaying: 'y', side: 'right'},
+                yaxis3: {title: 'MACD', overlaying: 'y', side: 'left', position: 0.95},
+                height: 500
+            };
+            var data = [trace1, trace2, trace3, trace4, trace5, trace6];
+            Plotly.newPlot('grafico_{{acao}}', data, layout);
         </script>
     {% endfor %}
     {% endif %}
@@ -66,6 +78,14 @@ def home():
             lista_acoes = [a.strip() for a in entrada.split(",") if a.strip()]
             analise = analisar_acoes(lista_acoes)
     return render_template_string(HTML, analise=analise, entrada=entrada)
+
+@app.route("/exportar")
+def exportar():
+    if 'analise' in globals():
+        arquivo = exportar_csv(globals()['analise'])
+        if arquivo:
+            return send_file(arquivo, as_attachment=True)
+    return "Nenhum resultado para exportar"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)
