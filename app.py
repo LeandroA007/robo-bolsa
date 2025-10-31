@@ -8,6 +8,7 @@ def buscar_dados(ticker, periodo="6mo"):
         dados["Retorno"] = dados["Close"].pct_change()
         dados["SMA20"] = dados["Close"].rolling(window=20).mean()
         dados["EMA20"] = dados["Close"].ewm(span=20, adjust=False).mean()
+
         # RSI 14 dias
         delta = dados["Close"].diff()
         up = delta.clip(lower=0)
@@ -16,11 +17,13 @@ def buscar_dados(ticker, periodo="6mo"):
         roll_down = down.rolling(14).mean()
         RS = roll_up / roll_down
         dados["RSI14"] = 100 - (100 / (1 + RS))
+
         # MACD
         EMA12 = dados["Close"].ewm(span=12, adjust=False).mean()
         EMA26 = dados["Close"].ewm(span=26, adjust=False).mean()
         dados["MACD"] = EMA12 - EMA26
         dados["Signal"] = dados["MACD"].ewm(span=9, adjust=False).mean()
+
         return dados
     except:
         return None
